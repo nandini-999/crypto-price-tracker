@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ coin.name }} ({{ coin.symbol | upper }})</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="container coin-page">
+
+    <!-- Coin Title -->
+    <h1 class="coin-title">
+        {{ coin.name }} ({{ coin.symbol | upper }})
+    </h1>
+
+    <!-- Line Chart -->
+    <canvas id="lineChart" width="800" height="350"></canvas>
+
+    <!-- Chart Script -->
+    <script>
+        const labels = {{ labels | tojson }};
+        const values = {{ values | tojson }};
+
+        new Chart(document.getElementById('lineChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Price (USD)',
+                    data: values,
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.25)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ffffff'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Price Trend (Last 1 Year)',
+                        color: '#ffffff',
+                        font: {
+                            size: 18
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month',
+                            color: '#ffffff',
+                            font: { size: 14 }
+                        },
+                        ticks: {
+                            color: '#ffffff',
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.1)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Price (USD)',
+                            color: '#ffffff',
+                            font: { size: 14 }
+                        },
+                        ticks: {
+                            color: '#ffffff',
+                            callback: value => '$' + value.toLocaleString()
+                        },
+                        grid: {
+                            color: 'rgba(255,255,255,0.1)'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <hr>
+
+    <!-- Coin Stats -->
+    <div class="stats">
+        <p><b>Market Rank:</b> {{ coin.market_cap_rank }}</p>
+
+        <p><b>Current Price:</b>
+            {% if coin.market_data is defined %}
+                ${{ coin.market_data.current_price.usd }}
+            {% else %}
+                N/A
+            {% endif %}
+        </p>
+
+        <p><b>Market Cap:</b>
+            {% if coin.market_data is defined %}
+                ${{ coin.market_data.market_cap.usd }}
+            {% else %}
+                N/A
+            {% endif %}
+        </p>
+
+        <p><b>24h High:</b>
+            {% if coin.market_data is defined %}
+                ${{ coin.market_data.high_24h.usd }}
+            {% else %}
+                N/A
+            {% endif %}
+        </p>
+
+        <p><b>24h Low:</b>
+            {% if coin.market_data is defined %}
+                ${{ coin.market_data.low_24h.usd }}
+            {% else %}
+                N/A
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Back Link -->
+    <a href="/" class="back-link">⬅ Back to Home</a>
+
+</div>
+</body>
+</html>

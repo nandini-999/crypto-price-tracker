@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Crypto Price Tracker</title>
+
+    <meta http-equiv="refresh" content="30">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+<div class="container">
+
+    <!-- TOP RIGHT AUTH BUTTONS -->
+    <div class="top-bar">
+        <a href="/login" class="auth-btn">Login</a>
+        <a href="/signup" class="auth-btn secondary">Sign Up</a>
+    </div>
+
+    <!-- APP TITLE -->
+    <h1 class="app-title">Crypto Price Tracker</h1>
+
+    <!-- Search Form -->
+    <form method="get">
+        <input type="text" name="search" placeholder="Search coin (e.g. bitcoin)">
+        <button type="submit">Search</button>
+    </form>
+
+    <br>
+
+    <!-- Price Table -->
+    <table>
+        <tr>
+            <th>Cryptocurrency</th>
+            <th>Price (USD)</th>
+        </tr>
+
+        {% for coin, data in prices.items() %}
+        <tr onclick="window.location='/coin/{{ coin }}'">
+            <td>
+                {{ coin | capitalize }}
+            </td>
+
+            <td>
+                {% if data.usd is defined %}
+                    ${{ "{:,.2f}".format(data.usd) }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    {% if prices|length == 0 %}
+        <p style="text-align:center; margin-top:20px; opacity:0.7;">
+            No cryptocurrency found
+        </p>
+    {% endif %}
+
+</div>
+</body>
+</html>
