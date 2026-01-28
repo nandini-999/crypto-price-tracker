@@ -245,3 +245,43 @@ tr {
 .auth-link a:hover {
     color: #9fd3ff;
 }
+/* Favorites button */
+.fav-btn {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-left: 10px;
+    text-decoration: none;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.fav-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Favorites Action Area */
+.favorite-action {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.fav-btn-large {
+    display: inline-block;
+    padding: 12px 24px;
+    background: linear-gradient(90deg, #ffd700, #ffaa00);
+    color: #000;
+    font-weight: bold;
+    font-size: 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+    transition: transform 0.2s;
+}
+
+.fav-btn-large:hover {
+    transform: scale(1.05);
+    opacity: 0.95;
+    color: #000;
+}

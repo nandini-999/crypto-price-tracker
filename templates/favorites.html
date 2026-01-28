@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Favorites - Crypto Price Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+</head>
+<body>
+<div class="container">
+    
+    <!-- Top Navigation -->
+    <div class="top-bar">
+        <a href="/" class="auth-btn">Home</a>
+        <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
+        <a href="/login" class="auth-btn">Login</a>
+        <a href="/signup" class="auth-btn secondary">Sign Up</a>
+    </div>
+
+    <h1 class="app-title">⭐ My Favorites</h1>
+
+    {% if prices and prices|length > 0 %}
+    <table>
+        <tr>
+            <th>Cryptocurrency</th>
+            <th>Price (USD)</th>
+            <th>Action</th>
+        </tr>
+        {% for coin, data in prices.items() %}
+        <tr>
+            <td>
+                <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
+            </td>
+            <td>
+                {% if data.usd is defined %}
+                    ${{ "{:,.2f}".format(data.usd) }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </td>
+            <td>
+                <a href="/remove_favorite/{{ coin }}" class="auth-btn" style="background: #ff4444; color: white;">❌ Remove</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <div style="text-align:center; padding: 20px;">
+            <p style="font-size: 18px; margin-bottom: 20px;">You haven't added any favorites yet.</p>
+            <a href="/" class="auth-btn">Browse Coins</a>
+        </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

@@ -14,10 +14,30 @@
 <body>
 <div class="container coin-page">
 
+    <!-- Top Navigation -->
+    <div class="top-bar">
+        <a href="/" class="auth-btn">Home</a>
+        <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
+        <a href="/login" class="auth-btn">Login</a>
+        <a href="/signup" class="auth-btn secondary">Sign Up</a>
+    </div>
+
     <!-- Coin Title -->
     <h1 class="coin-title">
         {{ coin.name }} ({{ coin.symbol | upper }})
     </h1>
+    <div class="favorite-action">
+        {% if is_favorite %}
+        <a href="/remove_favorite/{{ coin.id }}" class="fav-btn-large" style="background-color: #ff4444; border-color: #ff4444;">
+            ❌ Remove from Favorites
+        </a>
+        {% else %}
+        <a href="/add_favorite/{{ coin.id }}" class="fav-btn-large">
+            ⭐ Add to Favorites
+        </a>
+        {% endif %}
+    </div>
+
 
     <!-- Line Chart -->
     <canvas id="lineChart" width="800" height="350"></canvas>
@@ -143,7 +163,12 @@
     </div>
 
     <!-- Back Link -->
-    <a href="/" class="back-link">⬅ Back to Home</a>
+   <button class="back-link" onclick="window.location.replace('/')">
+    ⬅ Back to Home
+</button>
+
+
+
 
 </div>
 </body>

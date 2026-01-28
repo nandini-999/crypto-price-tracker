@@ -3,13 +3,19 @@
 <head>
     <title>Crypto Price Tracker</title>
 
-    <meta http-equiv="refresh" content="30">
-
-    <!-- Chart.js -->
+    <!-- Chart.js (not required on home, but okay to keep) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+    window.addEventListener("pageshow", function (event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
+</script>
+
 </head>
 
 <body>
@@ -17,6 +23,7 @@
 
     <!-- TOP RIGHT AUTH BUTTONS -->
     <div class="top-bar">
+        <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
         <a href="/login" class="auth-btn">Login</a>
         <a href="/signup" class="auth-btn secondary">Sign Up</a>
     </div>
@@ -25,26 +32,36 @@
     <h1 class="app-title">Crypto Price Tracker</h1>
 
     <!-- Search Form -->
-    <form method="get">
-        <input type="text" name="search" placeholder="Search coin (e.g. bitcoin)">
-        <button type="submit">Search</button>
-    </form>
+    <form method="post" action="/">
+    <input type="hidden" name="from_search" value="1">
+    <input type="text" name="search" placeholder="Search coin (e.g. bitcoin)">
+    <button type="submit">Search</button>
+</form>
+
+
+    <!-- View all coins link -->
+    {% if request.args.get("search") %}
+    <div style="text-align:center; margin-top:10px;">
+        <a href="/" style="opacity:0.8;">🔄 View all coins</a>
+    </div>
+    {% endif %}
 
     <br>
 
     <!-- Price Table -->
-    <table>
-        <tr>
-            <th>Cryptocurrency</th>
-            <th>Price (USD)</th>
-        </tr>
+    
+<table>
+    <tr>
+        <th>Cryptocurrency</th>
+        <th>Price (USD)</th>
+    </tr>
 
+    {% if prices and prices|length > 0 %}
         {% for coin, data in prices.items() %}
-        <tr onclick="window.location='/coin/{{ coin }}'">
+        <tr>
             <td>
-                {{ coin | capitalize }}
+                <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
             </td>
-
             <td>
                 {% if data.usd is defined %}
                     ${{ "{:,.2f}".format(data.usd) }}
@@ -54,13 +71,15 @@
             </td>
         </tr>
         {% endfor %}
-    </table>
-
-    {% if prices|length == 0 %}
-        <p style="text-align:center; margin-top:20px; opacity:0.7;">
-            No cryptocurrency found
-        </p>
+    {% else %}
+        <tr>
+            <td colspan="2" style="text-align:center;">
+                ⚠ Unable to load prices. Please refresh.
+            </td>
+        </tr>
     {% endif %}
+</table>
+
 
 </div>
 </body>

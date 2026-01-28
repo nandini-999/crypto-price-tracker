@@ -1,10 +1,15 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, redirect, url_for
 from datetime import datetime
 import requests
 import socket
 
 
+
+
+
 app = Flask(__name__)
+app.secret_key = "super_secret_key_for_crypto_app"  # Required for session
+LAST_GOOD_PRICES = {}
 
 COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -25,34 +30,55 @@ CRYPTO_COINS = [
 
 
 def fetch_prices():
+    global LAST_GOOD_PRICES
+
     params = {
         "ids": ",".join(CRYPTO_COINS),
         "vs_currencies": "usd"
     }
 
     try:
-        response = requests.get(COINGECKO_API, params=params, timeout=5)
+        response = requests.get(
+            COINGECKO_API,
+            params=params,
+            timeout=5
+        )
         response.raise_for_status()
-        return response.json()
+
+        data = response.json()
+
+        # ✅ Save good data
+        if data:
+            LAST_GOOD_PRICES = data
+
+        return data
 
     except requests.exceptions.RequestException as e:
         print("API error:", e)
-        return {}
+
+        # ✅ Fallback to last good data
+        return LAST_GOOD_PRICES
 
 
-@app.route("/")
+
+from flask import make_response
+
+@app.route("/", methods=["GET", "POST"])
 def index():
-    search = request.args.get("search")
     prices = fetch_prices()
 
-    if search:
-        prices = {
-            coin: data
-            for coin, data in prices.items()
-            if search.lower() in coin.lower()
-        }
+    if request.method == "POST":
+        search = request.form.get("search", "").strip()
+
+        if search:
+            prices = {
+                coin: data
+                for coin, data in prices.items()
+                if search.lower() in coin.lower()
+            }
 
     return render_template("index.html", prices=prices)
+
 
 @app.route("/coin/<coin_id>")
 def coin_detail(coin_id):
@@ -92,11 +118,17 @@ def coin_detail(coin_id):
         for p in month_prices.values()
     ]
 
+    is_favorite = False
+    if "favorites" in session:
+        if coin_id in session["favorites"]:
+            is_favorite = True
+
     return render_template(
         "coin.html",
         coin=coin_data,
         labels=labels,
-        values=values
+        values=values,
+        is_favorite=is_favorite
     )
 
 
@@ -123,6 +155,51 @@ def signup():
 
     return render_template("signup.html")
 
+
+
+
+
+
+
+
+@app.route("/favorites")
+def favorites():
+    favorites_list = session.get("favorites", [])
+    all_prices = fetch_prices()
+    
+    # Filter prices for only favorite coins
+    fav_prices = {
+        coin: data 
+        for coin, data in all_prices.items() 
+        if coin in favorites_list
+    }
+    
+    return render_template("favorites.html", prices=fav_prices)
+
+
+@app.route("/add_favorite/<coin_id>")
+def add_favorite(coin_id):
+    if "favorites" not in session:
+        session["favorites"] = []
+    
+    favorites = session["favorites"]
+    if coin_id not in favorites and coin_id in CRYPTO_COINS:
+        favorites.append(coin_id)
+        session.modified = True
+        
+    return redirect(url_for("favorites"))
+
+
+@app.route("/remove_favorite/<coin_id>")
+def remove_favorite(coin_id):
+    if "favorites" in session:
+        favorites = session["favorites"]
+        if coin_id in favorites:
+            favorites.remove(coin_id)
+            session.modified = True
+            
+    return redirect(url_for("favorites"))
+
+
 if __name__ == "__main__":
       app.run(debug=True)
-
