@@ -2,15 +2,15 @@ from flask import Flask, render_template, request, session, redirect, url_for
 from datetime import datetime
 import requests
 import socket
-
-
-
-
+from werkzeug.security import generate_password_hash, check_password_hash
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin123"  # change later
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_for_crypto_app"  # Required for session
 LAST_GOOD_PRICES = {}
-
+USERS_DB={}
+users = []
 COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
 
 # Save original getaddrinfo
@@ -59,9 +59,41 @@ def fetch_prices():
         # ✅ Fallback to last good data
         return LAST_GOOD_PRICES
 
+from flask import session, redirect, url_for
 
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["is_admin"] = True
+            return redirect(url_for("admin_dashboard"))
+
+        return render_template("admin_login.html", error="Invalid credentials")
+
+    return render_template("admin_login.html")
+
+def admin_required():
+    return session.get("is_admin")
 
 from flask import make_response
+@app.route("/admin")
+def admin_dashboard():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_login"))
+
+    return render_template(
+        "admin.html",
+        total_users=len(users),
+        users=users
+    )
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect(url_for("index"))
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -138,28 +170,61 @@ from flask import Flask, render_template, request, redirect, url_for
 
 # existing app setup stays same
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        # later: validate user (DynamoDB / Cognito)
-        return redirect(url_for("index"))
-
-    return render_template("login.html")
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        # later: create user (DynamoDB / Cognito)
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        # Check duplicate username
+        for u in users:
+            if u["username"] == username:
+                return render_template(
+                    "signup.html",
+                    error="Username already exists"
+                )
+
+        hashed_password = generate_password_hash(password)
+
+        users.append({
+            "username": username,
+            "email": email,
+            "password": hashed_password,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+
         return redirect(url_for("login"))
 
     return render_template("signup.html")
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        for u in users:
+            if u["username"] == username and check_password_hash(u["password"], password):
+                session["user"] = username
+                return redirect(url_for("index"))
+
+        return render_template(
+            "login.html",
+            error="Invalid username or password"
+        )
+
+    return render_template("login.html")
 
 
 
-
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
 
 
 @app.route("/favorites")
