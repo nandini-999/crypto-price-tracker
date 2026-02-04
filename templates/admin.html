@@ -33,6 +33,21 @@
         </p>
     {% endif %}
 
+    <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+        <h2>⚙️ Admin Settings</h2>
+        <form action="/admin/update_credentials" method="POST" style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto;">
+            <div class="form-group">
+                <label>New Admin Username</label>
+                <input type="text" name="new_username" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-group">
+                <label>New Admin Password</label>
+                <input type="password" name="new_password" placeholder="Leave blank to keep current">
+            </div>
+            <button type="submit" class="auth-btn" style="width: 100%; margin-top: 10px; background: #FF9800;">Update Credentials</button>
+        </form>
+    </div>
+
     <br>
     <a href="/admin/logout">🚪 Logout</a>
     <div style="text-align:center; margin: 20px;">

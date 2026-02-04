@@ -44,7 +44,17 @@
                 {% endif %}
             </td>
             <td>
-                <a href="/remove_favorite/{{ coin }}" class="auth-btn" style="background: #ff4444; color: white;">❌ Remove</a>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <a href="/remove_favorite/{{ coin }}" class="auth-btn" style="background: #ff4444; color: white; padding: 5px 10px; font-size: 14px;">❌ Remove</a>
+                    
+                    {% if session.user %}
+                    <form action="/set_alert" method="POST" style="display: flex; gap: 5px;">
+                        <input type="hidden" name="coin" value="{{ coin }}">
+                        <input type="number" step="0.01" name="threshold" placeholder="Alert Price ($)" style="width: 100px; padding: 5px;" required>
+                        <button type="submit" class="auth-btn" style="background: #4CAF50; color: white; padding: 5px 10px; font-size: 14px;">Set Alert</button>
+                    </form>
+                    {% endif %}
+                </div>
             </td>
         </tr>
         {% endfor %}

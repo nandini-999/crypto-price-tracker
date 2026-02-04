@@ -4,6 +4,7 @@ import requests
 import socket
 import time
 from werkzeug.security import generate_password_hash, check_password_hash
+import json
 from dotenv import load_dotenv
 import os
 
@@ -11,8 +12,22 @@ load_dotenv()
 
 # ================= CONFIG =================
 
+ADMIN_CONFIG_FILE = "admin_config.json"
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
+
+def load_admin_config():
+    global ADMIN_USERNAME, ADMIN_PASSWORD
+    if os.path.exists(ADMIN_CONFIG_FILE):
+        try:
+            with open(ADMIN_CONFIG_FILE, "r") as f:
+                data = json.load(f)
+                ADMIN_USERNAME = data.get("username", ADMIN_USERNAME)
+                ADMIN_PASSWORD = data.get("password", ADMIN_PASSWORD)
+        except Exception as e:
+            print(f"Error loading admin config: {e}")
+
+load_admin_config()
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_for_crypto_app"  # Required for session
@@ -53,6 +68,82 @@ if api_key:
 API_LOCK = threading.Lock()
 LAST_API_CALL = 0
 MIN_API_INTERVAL = 1.5   # Reduced to 1.5s with API key
+
+# SNS Setup
+SNS_TOPIC_ARN = None
+
+def init_aws_sns():
+    global SNS_TOPIC_ARN
+    try:
+        sns = boto3.client("sns", region_name="us-east-1")
+        # Create (or get existing) topic
+        topic = sns.create_topic(Name="CryptoPriceAlerts")
+        SNS_TOPIC_ARN = topic["TopicArn"]
+        print(f"SNS Topic Initialized: {SNS_TOPIC_ARN}")
+    except Exception as e:
+        print(f"Failed to init AWS SNS: {e}")
+
+# Initialize SNS on startup in a separate thread to not block
+threading.Thread(target=init_aws_sns).start()
+
+# Alerts storage: { "user_email": { "coin_id": { "threshold": 123.45, "last_alert": timestamp } } }
+# Or simpler: List of alert objects
+ALERTS = []  # [{"email": "...", "coin": "...", "threshold": 100.0, "cooldown": 0}]
+
+def check_alerts_background():
+    while True:
+        try:
+            if ALERTS and SNS_TOPIC_ARN:
+                # Group coins to fetch
+                coins_to_check = list(set(a["coin"] for a in ALERTS))
+                if coins_to_check:
+                    prices = fetch_prices_for_coins(coins_to_check)
+                    
+                    now = time.time()
+                    sns = boto3.client("sns", region_name="us-east-1")
+                    
+                    for alert in ALERTS:
+                        coin = alert["coin"]
+                        threshold = alert["threshold"]
+                        email = alert["email"]
+                        
+                        if coin in prices and "usd" in prices[coin]:
+                            current_price = prices[coin]["usd"]
+                            
+                            # Check if price dropped below threshold
+                            if current_price < threshold:
+                                # Check cooldown (e.g., 1 hour)
+                                if now - alert.get("cooldown", 0) > 3600:
+                                    message = (
+                                        f"Price Alert: {coin.title()} has dropped below ${threshold}!\n"
+                                        f"Current Price: ${current_price}\n"
+                                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                                    )
+                                    
+                                    # Publish to SNS with Message Attributes for filtering
+                                    sns.publish(
+                                        TopicArn=SNS_TOPIC_ARN,
+                                        Message=message,
+                                        Subject=f"Price Alert: {coin.title()}",
+                                        MessageAttributes={
+                                            "email": {
+                                                "DataType": "String",
+                                                "StringValue": email
+                                            }
+                                        }
+                                    )
+                                    print(f"Alert sent to {email} for {coin}")
+                                    alert["cooldown"] = now
+            
+            # Wait before next check (e.g., 60 seconds)
+            time.sleep(60)
+            
+        except Exception as e:
+            print(f"Alert background check failed: {e}")
+            time.sleep(60)
+
+# Start background thread
+threading.Thread(target=check_alerts_background, daemon=True).start()
 
 
 def fetch_top_10_coins():
@@ -323,11 +414,35 @@ def init_aws_resources():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
+        email = request.form.get("email")
+        
+        # Simple email check
+        if not email or "@" not in email:
+             return render_template("signup.html", error="Invalid email address")
+
         users.append({
             "username": request.form["username"],
+            "email": email,
             "password": generate_password_hash(request.form["password"]),
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
+        
+        # Subscribe user to SNS topic with filter policy
+        try:
+            if SNS_TOPIC_ARN:
+                sns_client = boto3.client("sns", region_name="us-east-1")
+                sns_client.subscribe(
+                    TopicArn=SNS_TOPIC_ARN,
+                    Protocol="email",
+                    Endpoint=email,
+                    Attributes={
+                        "FilterPolicy": f'{{"email": ["{email}"]}}'
+                    }
+                )
+                print(f"Subscribed {email} to SNS topic")
+        except Exception as e:
+            print(f"Failed to subscribe user to SNS: {e}")
+
         return redirect(url_for("login"))
     return render_template("signup.html")
 
@@ -370,7 +485,52 @@ def add_favorite(coin_id):
         session.modified = True
     return redirect(url_for("favorites"))
 
-# ================= ADMIN =================
+@app.route("/set_alert", methods=["POST"])
+def set_alert():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    
+    # Find user email
+    user_email = None
+    for u in users:
+        if u["username"] == session["user"]:
+            user_email = u.get("email")
+            break
+            
+    if not user_email:
+        # Should not happen if signed up correctly, but handle legacy users
+        return redirect(url_for("favorites"))
+
+    coin = request.form.get("coin")
+    threshold = request.form.get("threshold")
+    
+    if coin and threshold:
+        try:
+            threshold = float(threshold)
+            # Add or update alert
+            # Remove existing alert for this coin/user if any
+            global ALERTS
+            ALERTS = [a for a in ALERTS if not (a["email"] == user_email and a["coin"] == coin)]
+            
+            ALERTS.append({
+                "email": user_email,
+                "coin": coin,
+                "threshold": threshold,
+                "cooldown": 0
+            })
+            print(f"Alert set for {user_email}: {coin} < {threshold}")
+        except ValueError:
+            pass # Invalid number
+            
+    return redirect(url_for("favorites"))
+
+@app.route("/remove_favorite/<coin_id>")
+def remove_favorite(coin_id):
+    if "favorites" in session:
+        if coin_id in session["favorites"]:
+            session["favorites"].remove(coin_id)
+            session.modified = True
+    return redirect(url_for("favorites"))
 # ================= ADMIN =================
 
 @app.route("/admin/login", methods=["GET", "POST"])
@@ -401,6 +561,38 @@ def admin_dashboard():
         users=users,
         total_users=len(users)
     )
+
+
+@app.route("/admin/update_credentials", methods=["POST"])
+def update_credentials():
+    if not session.get("admin"):
+        return redirect(url_for("admin_login"))
+        
+    new_username = request.form.get("new_username", "").strip()
+    new_password = request.form.get("new_password", "").strip()
+    
+    global ADMIN_USERNAME, ADMIN_PASSWORD
+    
+    changed = False
+    if new_username:
+        ADMIN_USERNAME = new_username
+        changed = True
+    
+    if new_password:
+        ADMIN_PASSWORD = new_password
+        changed = True
+        
+    if changed:
+        try:
+            with open(ADMIN_CONFIG_FILE, "w") as f:
+                json.dump({
+                    "username": ADMIN_USERNAME,
+                    "password": ADMIN_PASSWORD
+                }, f)
+        except Exception as e:
+            print(f"Error saving admin config: {e}")
+            
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/admin/logout")
