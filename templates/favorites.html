@@ -24,21 +24,21 @@
 
     <h1 class="app-title">⭐ My Favorites</h1>
 
-    {% if prices and prices|length > 0 %}
+    {% if favorite_coins and favorite_coins|length > 0 %}
     <table>
         <tr>
             <th>Cryptocurrency</th>
             <th>Price (USD)</th>
             <th>Action</th>
         </tr>
-        {% for coin, data in prices.items() %}
+        {% for coin in favorite_coins %}
         <tr>
             <td>
                 <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
             </td>
             <td>
-                {% if data.usd is defined %}
-                    ${{ "{:,.2f}".format(data.usd) }}
+                {% if prices[coin] is defined and prices[coin].usd is defined %}
+                    ${{ "{:,.2f}".format(prices[coin].usd) }}
                 {% else %}
                     N/A
                 {% endif %}
