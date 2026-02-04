@@ -2,20 +2,7 @@
 <html>
 <head>
     <title>Crypto Price Tracker</title>
-
-    <!-- Chart.js (not required on home, but okay to keep) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script>
-    window.addEventListener("pageshow", function (event) {
-        if (event.persisted) {
-            window.location.reload();
-        }
-    });
-</script>
-
 </head>
 
 <body>
@@ -23,65 +10,72 @@
 
     <!-- TOP RIGHT AUTH BUTTONS -->
     <div class="top-bar">
-        <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
+        <a href="/favorites" class="auth-btn">Favorites</a>
         <a href="/login" class="auth-btn">Login</a>
         <a href="/signup" class="auth-btn secondary">Sign Up</a>
         <a href="/admin/login" class="auth-btn">Admin</a>
-
     </div>
 
     <!-- APP TITLE -->
     <h1 class="app-title">Crypto Price Tracker</h1>
 
-    <!-- Search Form -->
-    <form method="post" action="/">
-    <input type="hidden" name="from_search" value="1">
-    <input type="text" name="search" placeholder="Search coin (e.g. bitcoin)">
-    <button type="submit">Search</button>
-</form>
-
-
-    <!-- View all coins link -->
-    {% if request.args.get("search") %}
-    <div style="text-align:center; margin-top:10px;">
-        <a href="/" style="opacity:0.8;">🔄 View all coins</a>
-    </div>
-    {% endif %}
+    <!-- SEARCH -->
+    <form method="post" action="/search">
+        <input type="text" name="search" placeholder="Search coin (e.g. bitcoin)">
+        <button type="submit">Search</button>
+    </form>
 
     <br>
 
-    <!-- Price Table -->
-    
-<table>
-    <tr>
-        <th>Cryptocurrency</th>
-        <th>Price (USD)</th>
-    </tr>
+    <!-- 🔥 TOP 10 DASHBOARD -->
+    {% if search_results|length == 0 %}
+    <h2 style="text-align:center;">🔥 Top 10 Cryptocurrencies</h2>
 
-    {% if prices and prices|length > 0 %}
-        {% for coin, data in prices.items() %}
+    <table>
         <tr>
+            <th>#</th>
+            <th>Coin</th>
+            <th>Price (USD)</th>
+        </tr>
+
+        {% for coin in top_coins %}
+        <tr>
+            <td>#{{ loop.index }}</td>
             <td>
-                <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
+                <a href="/coin/{{ coin.id }}">
+                    {{ coin.name }} ({{ coin.symbol | upper }})
+                </a>
             </td>
-            <td>
-                {% if data.usd is defined %}
-                    ${{ "{:,.2f}".format(data.usd) }}
-                {% else %}
-                    N/A
-                {% endif %}
-            </td>
+            <td>${{ "{:,.2f}".format(coin.current_price) }}</td>
         </tr>
         {% endfor %}
-    {% else %}
-        <tr>
-            <td colspan="2" style="text-align:center;">
-                ⚠ Unable to load prices. Please refresh.
-            </td>
-        </tr>
+    </table>
     {% endif %}
-</table>
 
+    <!-- 🔍 SEARCH RESULTS -->
+    {% if search_results|length > 0 %}
+    <h2 style="margin-top:40px;">🔍 Search Results</h2>
+
+    <table>
+        <tr>
+            <th>Coin</th>
+            <th>Symbol</th>
+        </tr>
+
+        {% for coin in search_results %}
+        <tr>
+            <td>
+                <a href="/coin/{{ coin.id }}">{{ coin.name }}</a>
+            </td>
+            <td>{{ coin.symbol | upper }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div style="text-align:center; margin-top:15px;">
+        <a href="/" style="opacity:0.8;">⬅ Back to Top 10</a>
+    </div>
+    {% endif %}
 
 </div>
 </body>

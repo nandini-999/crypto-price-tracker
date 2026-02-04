@@ -11,6 +11,16 @@ body {
     margin: auto;
     padding: 20px;
 }
+.chart-container {
+    width: 100%;
+    max-width: 900px;
+    height: 240px;          /* compact height */
+    margin: 10px auto 25px auto;
+    padding: 10px;
+    background: rgba(0,0,0,0.15); /* subtle contrast */
+    border-radius: 12px;
+}
+
 .app-title {
     font-size: 56px;
     font-weight: 800;
@@ -285,3 +295,11 @@ tr {
     opacity: 0.95;
     color: #000;
 }
+.coin-title {
+    margin-bottom: 10px;   /* was too large */
+}
+
+.favorite-action {
+    margin-bottom: 15px;   /* tighten spacing */
+}
+

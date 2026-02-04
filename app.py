@@ -3,268 +3,332 @@ from datetime import datetime
 import requests
 import socket
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# ================= CONFIG =================
+
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"  # change later
+ADMIN_PASSWORD = "admin123"
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_for_crypto_app"  # Required for session
-LAST_GOOD_PRICES = {}
-USERS_DB={}
-users = []
+app.secret_key = "super_secret_key_for_crypto_app"
+
 COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
+TOP_COINS_API = "https://api.coingecko.com/api/v3/coins/markets"
+SEARCH_API = "https://api.coingecko.com/api/v3/search"
 
-# Save original getaddrinfo
 socket._orig_getaddrinfo = socket.getaddrinfo
-CRYPTO_COINS = [
-    "bitcoin",
-    "ethereum",
-    "ripple",
-    "solana",
-    "cardano",
-    "dogecoin",
-    "litecoin",
-    "polkadot",
-    "tron",
-    "avalanche-2"
-]
+
+LAST_TOP_COINS = []
+LAST_GOOD_PRICES = []
+users = []
 
 
-def fetch_prices():
-    global LAST_GOOD_PRICES
+# ================= DATA FETCH =================
+LAST_CHART_DATA = {}
 
-    params = {
-        "ids": ",".join(CRYPTO_COINS),
-        "vs_currencies": "usd"
-    }
+
+def fetch_top_10_coins():
+    global LAST_TOP_COINS
+    try:
+        r = requests.get(
+            TOP_COINS_API,
+            params={
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 10,
+                "page": 1
+            },
+            timeout=8
+        )
+        r.raise_for_status()
+        data = r.json()
+        if data:
+            LAST_TOP_COINS = data
+        return LAST_TOP_COINS
+    except Exception as e:
+        print("Top coins error:", e)
+        return LAST_TOP_COINS
+
+
+def search_any_coin(query):
+    try:
+        r = requests.get(SEARCH_API, params={"query": query}, timeout=8)
+        r.raise_for_status()
+        return r.json().get("coins", [])
+    except Exception as e:
+        print("Search error:", e)
+        return []
+def fetch_prices_for_coins(coins):
+    if not coins:
+        return {}
 
     try:
-        response = requests.get(
-            COINGECKO_API,
-            params=params,
-            timeout=5
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={
+                "ids": ",".join(coins),
+                "vs_currencies": "usd"
+            },
+            timeout=6
         )
-        response.raise_for_status()
+        r.raise_for_status()
+        return r.json()
+    except:
+        return {}
 
-        data = response.json()
+import time
 
-        # ✅ Save good data
-        if data:
-            LAST_GOOD_PRICES = data
+COIN_CACHE = {}
+CHART_CACHE = {}
+CACHE_TTL = 300  # seconds
 
-        return data
+def get_cached(cache, key):
+    entry = cache.get(key)
+    if entry and entry["expires"] > time.time():
+        return entry["data"]
+    return None
 
-    except requests.exceptions.RequestException as e:
-        print("API error:", e)
+def set_cache(cache, key, data):
+    cache[key] = {
+        "data": data,
+        "expires": time.time() + CACHE_TTL
+    }
 
-        # ✅ Fallback to last good data
-        return LAST_GOOD_PRICES
 
-from flask import session, redirect, url_for
+# ================= ROUTES =================
 
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session["is_admin"] = True
-            return redirect(url_for("admin_dashboard"))
-
-        return render_template("admin_login.html", error="Invalid credentials")
-
-    return render_template("admin_login.html")
-
-def admin_required():
-    return session.get("is_admin")
-
-from flask import make_response
-@app.route("/admin")
-def admin_dashboard():
-    if not session.get("is_admin"):
-        return redirect(url_for("admin_login"))
+@app.route("/", methods=["GET"])
+def index():
+    top_coins = fetch_top_10_coins()
 
     return render_template(
-        "admin.html",
-        total_users=len(users),
-        users=users
+        "index.html",
+        top_coins=top_coins,
+        search_results=[]   # ✅ ALWAYS an empty list
     )
 
-@app.route("/admin/logout")
-def admin_logout():
-    session.pop("is_admin", None)
-    return redirect(url_for("index"))
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    prices = fetch_prices()
+@app.route("/search", methods=["POST"])
+def search():
+    query = request.form.get("search", "").strip()
 
-    if request.method == "POST":
-        search = request.form.get("search", "").strip()
+    top_coins = fetch_top_10_coins()  # ✅ still loaded
+    search_results = []
 
-        if search:
-            prices = {
-                coin: data
-                for coin, data in prices.items()
-                if search.lower() in coin.lower()
-            }
+    if query:
+        search_results = search_any_coin(query)
 
-    return render_template("index.html", prices=prices)
+    return render_template(
+        "index.html",
+        top_coins=top_coins,
+        search_results=search_results
+    )
+
 
 
 @app.route("/coin/<coin_id>")
 def coin_detail(coin_id):
+    HEADERS = {"User-Agent": "CryptoPriceTracker/1.0"}
 
-    if coin_id not in CRYPTO_COINS:
-        return "Coin not supported", 404
-
-    HEADERS = {
-        "User-Agent": "CryptoPriceTracker/1.0"
+    # ---------- SAFE DEFAULT ----------
+    coin = {
+        "id": coin_id,
+        "name": coin_id.replace("-", " ").title(),
+        "symbol": "",
+        "market_cap_rank": "N/A",
+        "market_data": None
     }
 
-    coin_url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-    chart_url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    labels, values = [], []
 
-    coin_data = requests.get(coin_url, headers=HEADERS).json()
+    # ---------- COIN DATA ----------
+    cached = get_cached(COIN_CACHE, coin_id)
+    if cached:
+        coin = cached
+    else:
+        try:
+            time.sleep(1)  # ✅ avoid rate-limit
 
-    chart_data = requests.get(
-        chart_url,
-        params={"vs_currency": "usd", "days": 365},
-        headers=HEADERS,
-        timeout=10
-    ).json()
+            r = requests.get(
+                f"https://api.coingecko.com/api/v3/coins/{coin_id}",
+                headers=HEADERS,
+                timeout=10
+            )
 
-    prices = chart_data.get("prices", [])
+            if r.status_code == 200:
+                data = r.json()
 
-    from collections import defaultdict
-    month_prices = defaultdict(list)
+                # ✅ ONLY CACHE VALID DATA
+                if data.get("market_data"):
+                    coin = data
+                    set_cache(COIN_CACHE, coin_id, data)
 
-    for timestamp, price in prices:
-        if isinstance(price, (int, float)):
-            month = datetime.fromtimestamp(timestamp / 1000).strftime("%b %Y")
-            month_prices[month].append(price)
+        except Exception as e:
+            print("Coin fetch failed:", e)
 
-    labels = list(month_prices.keys())
-    values = [
-        round(sum(p) / len(p), 2)
-        for p in month_prices.values()
-    ]
+    # ---------- CHART ----------
+    cached_chart = get_cached(CHART_CACHE, coin_id)
+    if cached_chart:
+        labels, values = cached_chart
+    else:
+        try:
+            time.sleep(1)
 
-    is_favorite = False
-    if "favorites" in session:
-        if coin_id in session["favorites"]:
-            is_favorite = True
+            r = requests.get(
+                f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
+                params={"vs_currency": "usd", "days": 365},
+                headers=HEADERS,
+                timeout=10
+            )
+
+            if r.status_code == 200:
+                prices = r.json().get("prices", [])
+
+                if prices:
+                    from collections import OrderedDict
+                    monthly = OrderedDict()
+
+                    for ts, price in prices:
+                        month = datetime.fromtimestamp(
+                            ts / 1000
+                        ).strftime("%b %Y")
+                        monthly.setdefault(month, []).append(price)
+
+                    labels = list(monthly.keys())
+                    values = [round(sum(v)/len(v), 2) for v in monthly.values()]
+
+                    set_cache(CHART_CACHE, coin_id, (labels, values))
+
+        except Exception as e:
+            print("Chart fetch failed:", e)
+
+    is_favorite = coin_id in session.get("favorites", [])
 
     return render_template(
         "coin.html",
-        coin=coin_data,
+        coin=coin,
         labels=labels,
         values=values,
         is_favorite=is_favorite
     )
+import boto3
+def init_aws_resources():
+    dynamodb = boto3.resource(
+        "dynamodb",
+        region_name="us-east-1"
+    )
 
+    sns = boto3.client(
+        "sns",
+        region_name="us-east-1"
+    )
 
+    # Create DynamoDB table
+    table = dynamodb.create_table(
+        TableName="Users",
+        KeySchema=[
+            {"AttributeName": "username", "KeyType": "HASH"}
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "username", "AttributeType": "S"}
+        ],
+        BillingMode="PAY_PER_REQUEST"
+    )
 
+    # Create SNS topic
+    topic = sns.create_topic(Name="user-events")
 
-from flask import Flask, render_template, request, redirect, url_for
+    return table, topic["TopicArn"]
 
-# existing app setup stays same
-
-
+# ================= AUTH =================
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        username = request.form.get("username")
-        email = request.form.get("email")
-        password = request.form.get("password")
-
-        # Check duplicate username
-        for u in users:
-            if u["username"] == username:
-                return render_template(
-                    "signup.html",
-                    error="Username already exists"
-                )
-
-        hashed_password = generate_password_hash(password)
-
         users.append({
-            "username": username,
-            "email": email,
-            "password": hashed_password,
+            "username": request.form["username"],
+            "password": generate_password_hash(request.form["password"]),
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
-
         return redirect(url_for("login"))
-
     return render_template("signup.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-
         for u in users:
-            if u["username"] == username and check_password_hash(u["password"], password):
-                session["user"] = username
+            if u["username"] == request.form["username"] and \
+               check_password_hash(u["password"], request.form["password"]):
+                session["user"] = u["username"]
                 return redirect(url_for("index"))
-
-        return render_template(
-            "login.html",
-            error="Invalid username or password"
-        )
-
+        return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
-
 
 
 @app.route("/logout")
 def logout():
-    session.pop("user", None)
-    return redirect(url_for("login"))
-
-
+    session.clear()
+    return redirect(url_for("index"))
 @app.route("/favorites")
 def favorites():
-    favorites_list = session.get("favorites", [])
-    all_prices = fetch_prices()
-    
-    # Filter prices for only favorite coins
-    fav_prices = {
-        coin: data 
-        for coin, data in all_prices.items() 
-        if coin in favorites_list
-    }
-    
-    return render_template("favorites.html", prices=fav_prices)
+    if "user" not in session:
+        return redirect(url_for("login"))
 
+    favorite_coins = session.get("favorites", [])
+    prices = fetch_prices_for_coins(favorite_coins)
 
+    return render_template(
+        "favorites.html",
+        prices=prices
+    )
 @app.route("/add_favorite/<coin_id>")
 def add_favorite(coin_id):
-    if "favorites" not in session:
-        session["favorites"] = []
-    
-    favorites = session["favorites"]
-    if coin_id not in favorites and coin_id in CRYPTO_COINS:
-        favorites.append(coin_id)
+    session.setdefault("favorites", [])
+    if coin_id not in session["favorites"]:
+        session["favorites"].append(coin_id)
         session.modified = True
-        
     return redirect(url_for("favorites"))
 
+# ================= ADMIN =================
+# ================= ADMIN =================
 
-@app.route("/remove_favorite/<coin_id>")
-def remove_favorite(coin_id):
-    if "favorites" in session:
-        favorites = session["favorites"]
-        if coin_id in favorites:
-            favorites.remove(coin_id)
-            session.modified = True
-            
-    return redirect(url_for("favorites"))
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        if (
+            request.form["username"] == ADMIN_USERNAME and
+            request.form["password"] == ADMIN_PASSWORD
+        ):
+            session["admin"] = True
+            return redirect(url_for("admin_dashboard"))
 
+        return render_template(
+            "admin_login.html",
+            error="Invalid admin credentials"
+        )
+
+    return render_template("admin_login.html")
+
+
+@app.route("/admin/dashboard")
+def admin_dashboard():
+    if not session.get("admin"):
+        return redirect(url_for("admin_login"))
+
+    return render_template(
+        "admin.html",     # ✅ IMPORTANT
+        users=users,
+        total_users=len(users)
+    )
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin", None)
+    return redirect(url_for("admin_login"))
+
+# ================= RUN =================
 
 if __name__ == "__main__":
-      app.run(debug=True)
+    app.run(debug=True)
