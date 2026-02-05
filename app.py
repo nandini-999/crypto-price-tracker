@@ -331,8 +331,6 @@ def coin_detail(coin_id):
 def signup():
     if request.method == "POST":
         email = request.form.get("email")
-        
-        # Simple email check
         if not email or "@" not in email:
              return render_template("signup.html", error="Invalid email address")
 
@@ -392,6 +390,9 @@ def remove_favorite(coin_id):
         session["favorites"].remove(coin_id)
         session.modified = True
     return redirect(url_for("favorites"))
+
+
+ 
 
 
 
@@ -482,6 +483,8 @@ def init_aws_resources():
         return table, topic["TopicArn"]
     except Exception:
         return None, None
+
+ 
 
 # ================= RUN =================
 
