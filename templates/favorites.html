@@ -3,18 +3,9 @@
 <head>
     <title>My Favorites - Crypto Price Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script>
-        window.addEventListener("pageshow", function (event) {
-            if (event.persisted) {
-                window.location.reload();
-            }
-        });
-    </script>
 </head>
 <body>
 <div class="container">
-    
-    <!-- Top Navigation -->
     <div class="top-bar">
         <a href="/" class="auth-btn">Home</a>
         <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
@@ -23,6 +14,8 @@
     </div>
 
     <h1 class="app-title">⭐ My Favorites</h1>
+
+    {% set favorite_coins = session.get("favorites", []) %}
 
     {% if favorite_coins and favorite_coins|length > 0 %}
     <table>
@@ -37,7 +30,7 @@
                 <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
             </td>
             <td>
-                {% if prices[coin] is defined and prices[coin].usd is defined %}
+                {% if prices and prices[coin] is defined and prices[coin].usd is defined %}
                     ${{ "{:,.2f}".format(prices[coin].usd) }}
                 {% else %}
                     N/A
@@ -46,12 +39,11 @@
             <td>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <a href="/remove_favorite/{{ coin }}" class="auth-btn" style="background: #ff4444; color: white; padding: 5px 10px; font-size: 14px;">❌ Remove</a>
-                    
                     {% if session.user %}
                     <form action="/set_alert" method="POST" style="display: flex; gap: 5px;">
                         <input type="hidden" name="coin" value="{{ coin }}">
-                        <input type="number" step="0.01" name="threshold" placeholder="Alert Price ($)" style="width: 100px; padding: 5px;" required>
-                        <button type="submit" class="auth-btn" style="background: #4CAF50; color: white; padding: 5px 10px; font-size: 14px;">Set Alert</button>
+                        <input type="number" step="0.01" name="threshold" placeholder="Alert Price ($)" style="width: 120px; padding: 6px;" required>
+                        <button type="submit" class="auth-btn" style="background: #4CAF50; color: white; padding: 6px 10px; font-size: 14px;">Set Alert</button>
                     </form>
                     {% endif %}
                 </div>
@@ -65,7 +57,6 @@
             <a href="/" class="auth-btn">Browse Coins</a>
         </div>
     {% endif %}
-
 </div>
 </body>
 </html>
