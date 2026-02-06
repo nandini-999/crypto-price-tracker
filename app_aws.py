@@ -50,6 +50,22 @@ alerts_table = ensure_table(
     [{"AttributeName": "alert_id", "KeyType": "HASH"}],
     [{"AttributeName": "alert_id", "AttributeType": "S"}]
 )
+favorites_table = ensure_table(
+    "Favorites",
+    [
+        {"AttributeName": "username", "KeyType": "HASH"},
+        {"AttributeName": "coin", "KeyType": "RANGE"}
+    ],
+    [
+        {"AttributeName": "username", "AttributeType": "S"},
+        {"AttributeName": "coin", "AttributeType": "S"}
+    ]
+)
+def is_coin_favorite(username, coin_id):
+    res = favorites_table.get_item(
+        Key={"username": username, "coin": coin_id}
+    )
+    return "Item" in res
 
 # Fetch SNS topic ARN
 TOPIC_ARN = None
@@ -184,13 +200,16 @@ def coin_detail(coin_id):
 
     labels = list(monthly.keys())
     values = [round(sum(v) / len(v), 2) for v in monthly.values()]
+    is_favorite = False
+    if "user" in session:
+         is_favorite = is_coin_favorite(session["user"], coin_id)
 
     return render_template(
         "coin.html",
         coin=coin,
         labels=labels,
         values=values,
-        is_favorite=coin_id in session.get("favorites", [])
+        is_favorite=is_favorite
     )
 
 # ================== AUTH (DYNAMODB) ==================
@@ -247,26 +266,54 @@ def logout():
 
 # ================== FAVORITES ==================
 
+# ================== FAVORITES ==================
+
 @app.route("/favorites")
 def favorites():
-    favorite_coins = session.get("favorites", [])
-    prices = fetch_prices_for_coins(favorite_coins)
-    return render_template("favorites.html", prices=prices, favorite_coins=favorite_coins)
+    if "user" not in session:
+        return redirect(url_for("login"))
 
+    res = favorites_table.query(
+        KeyConditionExpression=Key("username").eq(session["user"])
+    )
+
+    coins = [item["coin"] for item in res.get("Items", [])]
+    prices = fetch_prices_for_coins(coins)
+
+    return render_template(
+        "favorites.html",
+        prices=prices,
+        favorite_coins=coins
+    )
 @app.route("/add_favorite/<coin_id>")
 def add_favorite(coin_id):
-    session.setdefault("favorites", [])
-    if coin_id not in session["favorites"]:
-        session["favorites"].append(coin_id)
-        session.modified = True
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    favorites_table.put_item(
+        Item={
+            "username": session["user"],
+            "coin": coin_id
+        }
+    )
+
     return redirect(url_for("favorites"))
+
 
 @app.route("/remove_favorite/<coin_id>")
 def remove_favorite(coin_id):
-    if "favorites" in session and coin_id in session["favorites"]:
-        session["favorites"].remove(coin_id)
-        session.modified = True
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    favorites_table.delete_item(
+        Key={
+            "username": session["user"],
+            "coin": coin_id
+        }
+    )
+
     return redirect(url_for("favorites"))
+
 
 @app.route("/set_alert", methods=["POST"])
 def set_alert():
