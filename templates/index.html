@@ -11,8 +11,13 @@
     <!-- TOP RIGHT AUTH BUTTONS -->
     <div class="top-bar">
         <a href="/favorites" class="auth-btn">Favorites</a>
+        {% if session.user %}
+        <span class="auth-btn" style="pointer-events:none; opacity:0.9;">{{ session.user }}</span>
+        <a href="/logout" class="auth-btn">Logout</a>
+        {% else %}
         <a href="/login" class="auth-btn">Login</a>
         <a href="/signup" class="auth-btn secondary">Sign Up</a>
+        {% endif %}
         <a href="/admin/login" class="auth-btn">Admin</a>
     </div>
 

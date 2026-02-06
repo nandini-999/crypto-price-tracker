@@ -15,6 +15,7 @@ load_dotenv()
 
 ADMIN_CONFIG_FILE = "admin_config.json"
 USERS_FILE = "users.json"
+ALERTS_FILE = "alerts.json"
 
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
@@ -45,9 +46,10 @@ load_admin_config()
 
 # Load users from disk
 users = load_json_file(USERS_FILE, [])
+alerts = load_json_file(ALERTS_FILE, [])
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_for_crypto_app"  # Required for session
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "super_secret_key_for_crypto_app")  # Required for session
 
 COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
 TOP_COINS_API = "https://api.coingecko.com/api/v3/coins/markets"
@@ -391,6 +393,36 @@ def remove_favorite(coin_id):
         session.modified = True
     return redirect(url_for("favorites"))
 
+@app.route("/set_alert", methods=["POST"])
+def set_alert():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    coin = request.form.get("coin")
+    threshold = request.form.get("threshold")
+    
+    # Find user email
+    user_email = ""
+    for u in users:
+        if u["username"] == session["user"]:
+            user_email = u.get("email", "")
+            break
+
+    if coin and threshold:
+        try:
+            alerts.append({
+                "user": session["user"],
+                "email": user_email,
+                "coin": coin,
+                "threshold": float(threshold),
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+            save_json_file(ALERTS_FILE, alerts)
+        except ValueError:
+            pass
+
+    return redirect(url_for("favorites"))
+
 
  
 
@@ -465,28 +497,44 @@ def update_credentials():
     
     return redirect(url_for("admin_dashboard"))
 
-def init_aws_resources():
-    try:
-        dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
-        sns = boto3.client("sns", region_name="us-east-1")
-        try:
-            table = dynamodb.create_table(
-                TableName="Users",
-                KeySchema=[{"AttributeName": "username", "KeyType": "HASH"}],
-                AttributeDefinitions=[{"AttributeName": "username", "AttributeType": "S"}],
-                BillingMode="PAY_PER_REQUEST"
-            )
-            table.wait_until_exists()
-        except Exception:
-            table = dynamodb.Table("Users")
-        topic = sns.create_topic(Name="CryptoPriceAlerts")
-        return table, topic["TopicArn"]
-    except Exception:
-        return None, None
+# AWS resources are not used in the local version
+
 
  
+
+def check_alerts_background():
+    while True:
+        try:
+            unique_coins = list({a["coin"] for a in alerts})
+            if unique_coins:
+                prices = fetch_prices_for_coins(unique_coins)
+                now = time.time()
+                
+                for a in alerts:
+                    coin = a["coin"]
+                    threshold = float(a["threshold"])
+                    last_alert_time = float(a.get("cooldown", 0))
+                    
+                    current_price_data = prices.get(coin)
+                    if current_price_data:
+                        current_price = current_price_data.get("usd")
+                        
+                        # Alert if price is below threshold (Dip Alert)
+                        if current_price is not None and current_price < threshold:
+                            if (now - last_alert_time) > 3600: # 1 hour cooldown
+                                print(f"🔔 [ALERT] {coin.title()} price ${current_price} is below ${threshold}")
+                                a["cooldown"] = str(now)
+                                save_json_file(ALERTS_FILE, alerts)
+
+        except Exception as e:
+            print(f"Error in alert background task: {e}")
+            
+        time.sleep(60)
 
 # ================= RUN =================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    threading.Thread(target=check_alerts_background, daemon=True).start()
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_ENV") == "development"
+    app.run(host="0.0.0.0", port=port, debug=debug)

@@ -1,0 +1,20 @@
+[
+    {
+        "username": "nandini999",
+        "email": "nandini.2327cseml103@kiet.edu",
+        "password": "scrypt:32768:8:1$xSjjTJVzuFPTbPIb$58caf4d8f52deb4f9f17cf8e756718dd924db4e5bdf3241714869a5a86737f6427a9080afd06f751c8417e90b18b9d6b2d41edfd1305c2e67ca9120411b949f8",
+        "created_at": "2026-02-05 19:27:29"
+    },
+    {
+        "username": "nandini999",
+        "email": "nandini.2327cseml103@kiet.edu",
+        "password": "scrypt:32768:8:1$TZNweoOwrku82YCd$69a4d6fe02f3e8b8c376449f53565b65061f429221257b16dd5c91ba7336506127f9226804462a61338a61c24d7cbdb1766e7bcbb3f5385670073a0ff356258f",
+        "created_at": "2026-02-05 19:58:48"
+    },
+    {
+        "username": "nandini999",
+        "email": "aryandevtyagi10@gmail.com",
+        "password": "scrypt:32768:8:1$DG4tlPOH6iELNQGP$ba997b5d0cc97c35df4510f514d874641475b92b611ce8428c3ea21e539e5f91367efdf05a345bd9338cb173404f4abfc5de4acd8d7ff61d5082ca47e99c46da",
+        "created_at": "2026-02-06 17:39:39"
+    }
+]

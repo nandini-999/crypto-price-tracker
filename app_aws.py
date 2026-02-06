@@ -7,18 +7,20 @@ import json
 import time
 import threading
 
+import os
+
 # ================== CONFIG ==================
 
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-REGION = "us-east-1"
+REGION = os.getenv("AWS_REGION", "us-east-1")
 USERS_TABLE = "Users"
 SNS_TOPIC_NAME = "user-events"
 ALERTS_TABLE = "Alerts"
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_for_crypto_app"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "super_secret_key_for_crypto_app")
 
 # ================== AWS CLIENTS ==================
 
@@ -247,7 +249,9 @@ def logout():
 
 @app.route("/favorites")
 def favorites():
-    return render_template("favorites.html", prices={})
+    favorite_coins = session.get("favorites", [])
+    prices = fetch_prices_for_coins(favorite_coins)
+    return render_template("favorites.html", prices=prices, favorite_coins=favorite_coins)
 
 @app.route("/add_favorite/<coin_id>")
 def add_favorite(coin_id):
@@ -329,4 +333,5 @@ def admin_logout():
 
 if __name__ == "__main__":
     threading.Thread(target=check_alerts_background, daemon=True).start()
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)

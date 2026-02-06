@@ -1,0 +1,16 @@
+[
+    {
+        "user": "nandini999",
+        "email": "nandini.2327cseml103@kiet.edu",
+        "coin": "bitcoin",
+        "threshold": 45.0,
+        "created_at": "2026-02-06 17:38:54"
+    },
+    {
+        "user": "nandini999",
+        "email": "nandini.2327cseml103@kiet.edu",
+        "coin": "bitcoin",
+        "threshold": 124.0,
+        "created_at": "2026-02-06 17:38:59"
+    }
+]
