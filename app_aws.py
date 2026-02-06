@@ -422,7 +422,7 @@ def set_alert():
 
 # ================== ADMIN ==================
 
-@app.route("/admin", methods=["GET", "POST"])
+@app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "POST":
         if (
