@@ -11,7 +11,7 @@ from boto3.dynamodb.conditions import Key
 # ================= CONFIG =================
 
 REGION = "us-east-1"
-TOPIC_ARN = "arn:aws:sns:us-east-1:216989138822:aws_capstone_topic"
+TOPIC_ARN = "arn:aws:sns:us-east-1:216989138822:user-events"
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
