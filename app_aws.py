@@ -68,14 +68,8 @@ def is_coin_favorite(username, coin_id):
     return "Item" in res
 
 # Fetch SNS topic ARN
-TOPIC_ARN = None
-try:
-    topics = sns.list_topics()["Topics"]
-    TOPIC_ARN = next(t["TopicArn"] for t in topics if SNS_TOPIC_NAME in t["TopicArn"])
-except Exception:
-    pass
-if not TOPIC_ARN:
-    TOPIC_ARN = sns.create_topic(Name=SNS_TOPIC_NAME)["TopicArn"]
+TOPIC_ARN = "arn:aws:sns:us-east-1:216989138822:aws_capstone_topic"
+
 
 # ================== COINGECKO ==================
 
