@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import time
 import threading
-
+from boto3.dynamodb.conditions import Key
 import os
 
 # ================== CONFIG ==================
