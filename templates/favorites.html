@@ -5,35 +5,44 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+
 <div class="container">
+
+    <!-- TOP BAR -->
     <div class="top-bar">
         <a href="/" class="auth-btn">Home</a>
         <a href="/favorites" class="auth-btn" style="background: rgba(255,255,255,0.2); color:white;">Favorites</a>
+
         {% if session.user %}
-        <span class="auth-btn" style="pointer-events:none; opacity:0.9;">{{ session.user }}</span>
-        <a href="/logout" class="auth-btn">Logout</a>
+            <span class="auth-btn" style="pointer-events:none; opacity:0.9;">
+                {{ session.user }}
+            </span>
+            <a href="/logout" class="auth-btn">Logout</a>
         {% else %}
-        <a href="/login" class="auth-btn">Login</a>
-        <a href="/signup" class="auth-btn secondary">Sign Up</a>
+            <a href="/login" class="auth-btn">Login</a>
+            <a href="/signup" class="auth-btn secondary">Sign Up</a>
         {% endif %}
     </div>
 
+    <!-- TITLE -->
     <h1 class="app-title">⭐ My Favorites</h1>
 
-    {% set favorite_coins = session.get("favorites", []) %}
-
+    <!-- FAVORITES TABLE -->
     {% if favorite_coins and favorite_coins|length > 0 %}
+
     <table>
         <tr>
             <th>Cryptocurrency</th>
             <th>Price (USD)</th>
             <th>Action</th>
         </tr>
+
         {% for coin in favorite_coins %}
         <tr>
             <td>
                 <a href="/coin/{{ coin }}">{{ coin | capitalize }}</a>
             </td>
+
             <td>
                 {% if prices and prices[coin] is defined and prices[coin].usd is defined %}
                     ${{ "{:,.2f}".format(prices[coin].usd) }}
@@ -41,27 +50,53 @@
                     N/A
                 {% endif %}
             </td>
+
             <td>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <a href="/remove_favorite/{{ coin }}" class="auth-btn" style="background: #ff4444; color: white; padding: 5px 10px; font-size: 14px;">❌ Remove</a>
+                <div style="display:flex; gap:10px; align-items:center;">
+
+                    <!-- REMOVE FAVORITE -->
+                    <a href="/remove_favorite/{{ coin }}"
+                       class="auth-btn"
+                       style="background:#ff4444; color:white; padding:5px 10px; font-size:14px;">
+                        ❌ Remove
+                    </a>
+
+                    <!-- ALERT FORM -->
                     {% if session.user %}
-                    <form action="/set_alert" method="POST" style="display: flex; gap: 5px;">
+                    <form action="/set_alert" method="POST" style="display:flex; gap:5px;">
                         <input type="hidden" name="coin" value="{{ coin }}">
-                        <input type="number" step="0.01" name="threshold" placeholder="Alert Price ($)" style="width: 120px; padding: 6px;" required>
-                        <button type="submit" class="auth-btn" style="background: #4CAF50; color: white; padding: 6px 10px; font-size: 14px;">Set Alert</button>
+                        <input type="number"
+                               step="0.01"
+                               name="threshold"
+                               placeholder="Alert Price ($)"
+                               style="width:120px; padding:6px;"
+                               required>
+                        <button type="submit"
+                                class="auth-btn"
+                                style="background:#4CAF50; color:white; padding:6px 10px; font-size:14px;">
+                            Set Alert
+                        </button>
                     </form>
                     {% endif %}
+
                 </div>
             </td>
         </tr>
         {% endfor %}
+
     </table>
+
     {% else %}
-        <div style="text-align:center; padding: 20px;">
-            <p style="font-size: 18px; margin-bottom: 20px;">You haven't added any favorites yet.</p>
+        <!-- EMPTY STATE -->
+        <div style="text-align:center; padding:20px;">
+            <p style="font-size:18px; margin-bottom:20px;">
+                You haven't added any favorites yet.
+            </p>
             <a href="/" class="auth-btn">Browse Coins</a>
         </div>
     {% endif %}
+
 </div>
+
 </body>
 </html>
