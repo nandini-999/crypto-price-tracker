@@ -497,7 +497,24 @@ def update_credentials():
     
     return redirect(url_for("admin_dashboard"))
 
-# AWS resources are not used in the local version
+def init_aws_resources():
+    region = os.getenv("AWS_REGION", "us-east-1")
+    dynamodb = boto3.resource("dynamodb", region_name=region)
+    sns = boto3.client("sns", region_name=region)
+    try:
+        dynamodb.meta.client.describe_table(TableName="Users")
+        table = dynamodb.Table("Users")
+    except Exception:
+        t = dynamodb.create_table(
+            TableName="Users",
+            KeySchema=[{"AttributeName": "username", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "username", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST"
+        )
+        t.wait_until_exists()
+        table = t
+    topic_arn = sns.create_topic(Name="CryptoPriceAlerts")["TopicArn"]
+    return table, topic_arn
 
 
  
