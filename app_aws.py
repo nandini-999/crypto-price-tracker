@@ -84,9 +84,16 @@ SEARCH_API = "https://api.coingecko.com/api/v3/search"
 
 # ================== HELPERS ==================
 
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "CryptoPriceTracker/1.0"})
+api_key = os.getenv("COINGECKO_API_KEY")
+if api_key:
+    header_name = "x-cg-demo-api-key" if api_key.startswith("CG-") else "x-cg-pro-api-key"
+    SESSION.headers.update({header_name: api_key})
+
 def fetch_top_10_coins():
     try:
-        r = requests.get(
+        r = SESSION.get(
             TOP_COINS_API,
             params={
                 "vs_currency": "usd",
@@ -103,7 +110,7 @@ def fetch_top_10_coins():
 
 def search_any_coin(query):
     try:
-        r = requests.get(
+        r = SESSION.get(
             SEARCH_API,
             params={"query": query},
             timeout=8
@@ -116,7 +123,7 @@ def search_any_coin(query):
 def fetch_prices_for_coins(coins):
     if not coins:
         return {}
-    r = requests.get(
+    r = SESSION.get(
         "https://api.coingecko.com/api/v3/simple/price",
         params={"ids": ",".join(coins), "vs_currencies": "usd"},
         timeout=8
@@ -178,12 +185,12 @@ def search():
 
 @app.route("/coin/<coin_id>")
 def coin_detail(coin_id):
-    coin = requests.get(
+    coin = SESSION.get(
         f"https://api.coingecko.com/api/v3/coins/{coin_id}",
         timeout=10
     ).json()
 
-    chart = requests.get(
+    chart = SESSION.get(
         f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
         params={"vs_currency": "usd", "days": 365},
         timeout=10
